@@ -1,0 +1,63 @@
+ Создайте в домашней директории пользователя файл wiki.yml для приложения MediaWiki. • Средствами docker compose должен создаваться стек контейнеров с приложением MediaWiki и базой данных. • Используйте два сервиса • Основной контейнер MediaWiki должен называться wiki и использовать образ mediawiki • Файл LocalSettings.php с корректными настройками должен находиться в домашней папке пользователя и автоматически монтироваться в образ. • Контейнер с базой данных должен называться mariadb и использовать образ mariadb. • Разверните • Он должен создавать базу с названием mediawiki, доступную по стандартному порту, пользователя wiki с паролем WikiP@ssw0rd должен иметь права доступа к этой базе данных • MediaWiki должна быть доступна извне через порт 8080.
+
+Установка Docker и Docker-compose:
+
+apt-get update && apt-get install -y docker-engine
+apt-get install -y docker-compose
+Автозагрузка Docker:
+
+systemctl enable --now docker
+Привязка пользователя к Docker:
+
+usermod user -aG docker
+Переходим к домашней директории пользователя:
+
+cd /home/user
+Создаём файл wiki.yml:
+
+touch wiki.yml
+version: '3'
+services:
+  wiki:
+    image: mediawiki
+    restart: always
+    ports:
+      - 8080:80
+    links:
+      - database
+    container_name: wiki
+    volumes:
+      - images:/var/www/html/images
+# Сначала устанавливаем вручную до конца, потом убираем комментарий
+#      - ./LocalSettings.php:/var/www/html/LocalSettings.php
+  database:
+    image: mariadb
+    container_name: mariadb
+    restart: always
+    environment:
+      MYSQL_DATABASE: mediawiki
+      MYSQL_USER: wiki
+      MYSQL_PASSWORD: WikiP@ssw0rd
+      MYSQL_RANDOM_ROOT_PASSWORD: 'yes'
+      TZ: Asia/Yekaterinburg
+    volumes:
+      - db:/var/lib/mysql
+volumes:
+  images:
+  db:
+Запускаем контейнеры:
+
+docker compose -f wiki.yml up -d
+Переходим по <ip-сервера>:8080 и должно появиться - 'Please set up the wiki first'
+
+Для того, чтобы узнать хост базы данных:
+
+docker exec -it mariadb bash
+hostname -i
+Вывод
+
+172.18.0.2
+
+Принимаем условия Далее
+
+Все должно быть глатко!
