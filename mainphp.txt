@@ -1,0 +1,131 @@
+Для того чтобы MediaWiki находилась в отдельном контейнере, вы можете использовать ту же концепцию с Docker Compose, разделяя оба сервиса: один для MediaWiki, другой для MariaDB. Они будут находиться в отдельных контейнерах, а их связь будет осуществляться через внутреннюю сеть Docker.
+
+### Шаг 1: Установка Docker и Docker Compose
+
+Убедитесь, что Docker и Docker Compose уже установлены на вашей машине (см. предыдущий шаг 1).
+
+### Шаг 2: Создание нового проекта с Docker Compose
+
+1. Создайте новую директорию для проекта:
+
+   ```bash
+   mkdir mediawiki-separate-containers
+   cd mediawiki-separate-containers
+   ```
+2. В этой директории создайте файл `docker-compose.yml` для описания двух независимых контейнеров: один для MediaWiki, другой для MariaDB.
+
+### Шаг 3: Настройка файла `docker-compose.yml`
+
+Откройте ваш текстовый редактор и создайте файл `docker-compose.yml` со следующим содержимым:
+
+```yaml
+version: '3.7'
+
+services:
+  mariadb:
+    image: mariadb:latest
+    container_name: mariadb
+    environment:
+      MYSQL_ROOT_PASSWORD: example_root_password  # Замените на ваш пароль
+      MYSQL_DATABASE: mediawiki_db
+      MYSQL_USER: mediawiki_user
+      MYSQL_PASSWORD: example_password  # Замените на ваш пароль
+    volumes:
+      - db_data:/var/lib/mysql
+    networks:
+      - mediawiki_network
+
+  mediawiki:
+    image: mediawiki:latest
+    container_name: mediawiki
+    ports:
+      - "8080:80"
+    depends_on:
+      - mariadb
+    environment:
+      MEDIAWIKI_DB_TYPE: mariadb
+      MEDIAWIKI_DB_HOST: mariadb
+      MEDIAWIKI_DB_NAME: mediawiki_db
+      MEDIAWIKI_DB_USER: mediawiki_user
+      MEDIAWIKI_DB_PASSWORD: example_password  # Должно совпадать с паролем, указанным выше
+    volumes:
+      - mediawiki_images:/var/www/html/images
+    networks:
+      - mediawiki_network
+
+networks:
+  mediawiki_network:
+    driver: bridge
+
+volumes:
+  db_data:
+  mediawiki_images:
+```
+
+### Объяснение:
+
+- **mariadb**: Контейнер для базы данных MariaDB.
+  - Пароли и параметры базы данных настроены через переменные среды.
+  - Данные сохраняются в томе `db_data`.
+  - Контейнер подключен к сети `mediawiki_network`.
+- **mediawiki**: Контейнер для MediaWiki.
+  - Сайт MediaWiki будет доступен на порту `8080` на хосте.
+  - MediaWiki подключена к той же сети `mediawiki_network`, чтобы иметь доступ к MariaDB через внутренний хост `mariadb`.
+  - Изображения сохраняются в томе `mediawiki_images`.
+
+### Шаг 4: Запуск контейнеров
+
+1. Запустите контейнеры с помощью команды:
+
+   ```bash
+   docker-compose up -d
+   ```
+2. Убедитесь, что контейнеры работают:
+
+   ```bash
+   docker ps
+   ```
+
+Вы должны увидеть два контейнера: один для MariaDB, второй для MediaWiki.
+
+### Шаг 5: Настройка MediaWiki
+
+1. Откройте браузер и перейдите по адресу `http://localhost:8080`.
+2. Вы увидите страницу установки MediaWiki.
+3. На шаге настройки базы данных введите следующие данные:
+   - **Тип базы данных**: MySQL
+   - **Имя базы данных**: `mediawiki_db`
+   - **Имя пользователя**: `mediawiki_user`
+   - **Пароль**: `example_password`
+   - **Хост базы данных**: `mariadb` (имя контейнера MariaDB)
+4. Завершите установку MediaWiki, следуя остальным шагам.
+
+### Шаг 6: Остановка и перезапуск контейнеров
+
+- Чтобы остановить контейнеры:
+
+  ```bash
+  docker-compose down
+  ```
+- Чтобы перезапустить контейнеры:
+
+  ```bash
+  docker-compose up -d
+  ```
+
+### Шаг 7: Резервное копирование данных
+
+1. **MariaDB**: Данные базы данных сохраняются в томе `db_data`. Для резервного копирования можно экспортировать базу данных с помощью команды:
+
+   ```bash
+   docker exec mariadb mysqldump -u mediawiki_user -p mediawiki_db > backup.sql
+   ```
+2. **MediaWiki**: Файлы MediaWiki (включая изображения) сохраняются в томе `mediawiki_images`. Для резервного копирования можно просто скопировать этот том:
+
+   ```bash
+   docker cp $(docker-compose ps -q mediawiki):/var/www/html/images ./backup_images
+   ```
+
+Теперь ваша MediaWiki и MariaDB работают в отдельных контейнерах Docker, и они успешно связаны через сеть.
+
+
